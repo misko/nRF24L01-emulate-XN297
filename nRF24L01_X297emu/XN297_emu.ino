@@ -94,8 +94,8 @@ void XN297_SetRXAddr(const uint8_t* addr, uint8_t len)
 
 void XN297_Configure(uint8_t flags)
 {
-    xn297_crc = !!(flags & _BV(NRF24L01_00_EN_CRC));
-    flags &= ~(_BV(NRF24L01_00_EN_CRC) | _BV(NRF24L01_00_CRCO));
+    xn297_crc = !!(flags & _BV(NRF24L01_00_EN_CRC)); //only used in TX
+    flags &= ~(_BV(NRF24L01_00_EN_CRC) | _BV(NRF24L01_00_CRCO));  //remove EN CRC bits
     NRF24L01_WriteReg(NRF24L01_00_CONFIG, flags);
 }
 
@@ -119,6 +119,7 @@ uint8_t XN297_WritePayload(uint8_t* msg, uint8_t len)
         uint8_t b_out = bit_reverse(msg[i]);
         buf[last++] = b_out ^ xn297_scramble[xn297_addr_len+i];
     }
+    
     if (xn297_crc) {
         uint8_t offset = xn297_addr_len < 4 ? 1 : 0;
         uint16_t crc = initial;
@@ -133,6 +134,22 @@ uint8_t XN297_WritePayload(uint8_t* msg, uint8_t len)
     return res;
 }
 
+void XN297_SetTxRxMode(enum TXRX_State mode) {
+  
+  NRF24L01_SetTxRxMode( mode);
+  if (mode==RX_EN) {
+                NRF24L01_WriteReg(NRF24L01_00_CONFIG, _BV(NRF24L01_00_PWR_UP) | _BV(NRF24L01_00_PRIM_RX)); // go into recieve mode
+                xn297_crc=0;
+  }
+  if (mode==TX_EN) {
+                NRF24L01_WriteReg(NRF24L01_00_CONFIG, _BV(NRF24L01_00_PWR_UP) );
+                xn297_crc=1;
+  }
+  NRF24L01_WriteReg(NRF24L01_07_STATUS, 0x70);
+  NRF24L01_FlushRx();
+  NRF24L01_FlushTx();
+
+}
 uint8_t XN297_ReadPayload(uint8_t* msg, uint8_t len)
 {
     uint8_t res = NRF24L01_ReadPayload(msg, len);
