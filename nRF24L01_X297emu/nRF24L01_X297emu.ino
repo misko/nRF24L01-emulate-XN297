@@ -1,6 +1,7 @@
 #include <util/atomic.h>
 #include <EEPROM.h>
 #include "iface_nrf24l01.h"
+#include "holystone710.h"
 
 #define MOSI_pin  5  // MOSI - D3
 #define SCK_pin   7  // SCK  - D4
@@ -22,25 +23,24 @@
 
 #define RF_POWER TX_POWER_80mW 
 
-uint8_t tx_addr[5] = {0x24,0x6a,0x6a,0x1a,0x82};
-uint8_t rx_addr[5] = {0x24,0x6a,0x6a,0x1a,0x82}; //set command scrambles it
-
-uint8_t unlock_packet[]= {0xCA,0xb6,0xde,0x24,
-                  0x7d,0x7d,0x7d,0x7d,
-                  0x20,0x20,0x20,0x78,
-                  0xC0,
-                  0x36,0x40,0x64,0x40,0x21,
-                  0x0,0x0,0x0,
-                  0x0,0x0,0x0};
-
-                //WRITE TX 0xa0 (channel 70) TX-> 0x8d.b6.de.24.7d.7d.7d.7d.20.20.20.7f.a0.76.40.4.40.21.0.0.0.0.0.0
-                // WRITE TX 0xa0 (channel 70) TX-> 0x8d.b6.de.24.7d.7d.7d.7d.20.20.20.7f.e0.36.40.4.40.21.0.0.0.0.0.0
-                  
+      
 uint8_t packet[128];
 uint8_t counter=0;
 
-//uint8_t payload_size=24+2;//transmitter packets are 24 bytes + 2 crc
-uint8_t payload_size=16+2;//drone packets are 16 bytes + 2 crc
+//uint8_t payload_size=24;//+2;//transmitter packets are 24 bytes + 2 crc
+uint8_t payload_size=16;//+2;//drone packets are 16 bytes + 2 crc
+
+HS710_TransmitterState ts;
+
+//float in -100 <> +100
+uint8_t float_to_byte(float f,uint8_t min_val,uint8_t max_val) {
+  return ( (f/100.0+1)/2 )*(max_val-min_val)+min_val;
+}
+
+uint8_t set_bit_state(uint8_t d, uint8_t n, bool state) {
+  return state ? d&~_BV(n) : d|_BV(n);
+}
+
 void setup()
 {
     Serial.begin(9600);
@@ -53,8 +53,8 @@ void setup()
     NRF24L01_Reset();
     NRF24L01_Initialize();
     delay(10);
-    XN297_SetTXAddr(tx_addr, 5);
-    XN297_SetRXAddr(tx_addr, 5); //calls setup AW
+    XN297_SetTXAddr(HS710_tx_addr, 5);
+    XN297_SetRXAddr(HS710_tx_addr, 5); //calls setup AW
 
     NRF24L01_WriteReg(NRF24L01_07_STATUS, 0x70);     // Clear data ready, data sent, and retransmit
     NRF24L01_WriteReg(NRF24L01_01_EN_AA, 0x00);      // No Auto Acknowledgment on all data pipes
@@ -76,6 +76,27 @@ void setup()
     NRF24L01_Activate(0x73);                         // Activate feature register
 
     delay(150);
+    
+    ts = {
+      .lCtrl_v=0.0,
+      .lCtrl_h=0.0,
+      .rCtrl_v=0.0,
+      .rCtrl_h=0.0,
+      .channel_pulse=false,
+      .gpshome_b=false,
+      .picture_b=false,
+      .highlow_b=false,
+      .takeoff_b=false,
+      .lock_b=false,
+      .gpsen_b=false,
+      .rf_channels = {56,62,70,64},
+      .rf_channel = 0,
+      .time_start = micros(),
+      .time_channel_emit_last = 0,
+      .time_channel_emit_freq = 7500,
+      .time_channel_hop_length = 2, // in terms of emit freq
+
+    };
 }
 
 void loop()
@@ -92,12 +113,12 @@ void loop()
     }*/
     
     //RX things
-    XN297_SetTxRxMode(RX_EN);
+    /*XN297_SetTxRxMode(RX_EN);
     packet[0]=0;
     uint32_t timeout = millis()+3;
     while(millis()<timeout) {
         if(NRF24L01_ReadReg(NRF24L01_07_STATUS) & _BV(NRF24L01_07_RX_DR)) { // data received from aircraft
-            uint8_t crc_pass=XN297_ReadPayload(packet, payload_size);
+            uint8_t crc_pass=XN297_ReadPayload(packet, payload_size+2);
             if (crc_pass) {
               for (int i=0; i<payload_size; i++) {
                 Serial.print(packet[i],HEX);
@@ -109,7 +130,13 @@ void loop()
               //NRF24L01_FlushRx();
             }
         }
-    }
+    }*/
+
+    //
+    
+      //Serial.println("PROCESS");
+      HS710_process(&ts);
+    //delay(100);
                 
 
 }

@@ -15,8 +15,9 @@
 
 #ifndef _IFACE_NRF24L01_H_
 #define _IFACE_NRF24L01_H_
-
 #include <Arduino.h>
+
+#include "misc.h"
 
 // Register map
 enum {
@@ -91,11 +92,6 @@ enum {
     NRF24L01_BR_RSVD
 };
 
-enum TXRX_State {
-    TXRX_OFF,
-    TX_EN,
-    RX_EN,
-};
 
 // RF Tx Power (estimations with RFX2401C PA)
 // RFX2401C power amp is ~+25dB (saturates at 22dBm) so:
