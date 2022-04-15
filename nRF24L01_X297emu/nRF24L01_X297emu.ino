@@ -39,8 +39,8 @@ uint8_t unlock_packet[]= {0xCA,0xb6,0xde,0x24,
 uint8_t packet[128];
 uint8_t counter=0;
 
-uint8_t payload_size=16; //24 is transmitter , 16 is drone
-
+//uint8_t payload_size=24+2;//transmitter packets are 24 bytes + 2 crc
+uint8_t payload_size=16+2;//drone packets are 16 bytes + 2 crc
 void setup()
 {
     Serial.begin(9600);
@@ -80,7 +80,7 @@ void setup()
 
 void loop()
 {
-    if (counter++==0) {
+    /*if (counter++==0) {
       //Send unlock command to HS710
       XN297_SetTxRxMode(TX_EN);
       delayMicroseconds(5);
@@ -89,7 +89,7 @@ void loop()
               NRF24L01_WriteReg(NRF24L01_05_RF_CH,56);
               XN297_WritePayload(unlock_packet, sizeof(unlock_packet)); //(bind packet)
       delay(1);
-    }
+    }*/
     
     //RX things
     XN297_SetTxRxMode(RX_EN);
@@ -97,13 +97,18 @@ void loop()
     uint32_t timeout = millis()+3;
     while(millis()<timeout) {
         if(NRF24L01_ReadReg(NRF24L01_07_STATUS) & _BV(NRF24L01_07_RX_DR)) { // data received from aircraft
-            XN297_ReadPayload(packet, 24);
-            if( packet[9] != 194)
-            break;
+            uint8_t crc_pass=XN297_ReadPayload(packet, payload_size);
+            if (crc_pass) {
+              for (int i=0; i<payload_size; i++) {
+                Serial.print(packet[i],HEX);
+              }
+              Serial.println("");
+              break;
+            } else {
+              //NRF24L01_WriteReg(NRF24L01_07_STATUS, 0x70);
+              //NRF24L01_FlushRx();
+            }
         }
-    }
-    if (packet[0]!=0) {
-      Serial.println(packet[0]);
     }
                 
 

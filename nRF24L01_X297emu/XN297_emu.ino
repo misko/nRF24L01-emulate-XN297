@@ -16,6 +16,8 @@
 static uint8_t xn297_addr_len;
 static uint8_t xn297_tx_addr[5];
 static uint8_t xn297_rx_addr[5];
+static uint8_t xn297_rx_addr_scrambled[5];
+static uint16_t xn297_rx_addr_scrambled_crc;
 static uint8_t xn297_crc = 0;
 
 static const uint8_t xn297_scramble[] = {
@@ -31,6 +33,16 @@ static const uint16_t xn297_crc_xorout[] = {
     0xD461, 0xF494, 0x2503, 0x691D, 0xFE8B, 0x9BA7,
     0x8B17, 0x2920, 0x8B5F, 0x61B1, 0xD391, 0x7401, 
     0x2138, 0x129F, 0xB3A0, 0x2988};
+
+    
+// scrambled, standard mode crc xorout table
+static const uint16_t xn297_crc_xorout_scrambled[] = {
+    0x0000, 0x3448, 0x9BA7, 0x8BBB, 0x85E1, 0x3E8C,
+    0x451E, 0x18E6, 0x6B24, 0xE7AB, 0x3828, 0x814B,
+    0xD461, 0xF494, 0x2503, 0x691D, 0xFE8B, 0x9BA7,
+    0x8B17, 0x2920, 0x8B5F, 0x61B1, 0xD391, 0x7401,
+    0x2138, 0x129F, 0xB3A0, 0x2988, 0x23CA, 0xC0CB,
+    0x0C6C, 0xB329, 0xA0A1, 0x0A16, 0xA9D0 };
 
 uint8_t bit_reverse(uint8_t b_in)
 {
@@ -88,6 +100,12 @@ void XN297_SetRXAddr(const uint8_t* addr, uint8_t len)
     for (uint8_t i = 0; i < xn297_addr_len; ++i) {
         buf[i] = xn297_rx_addr[i] ^ xn297_scramble[xn297_addr_len-i-1];
     }
+    //store the scramble and precompute the crc for it
+    memcpy(xn297_rx_addr_scrambled, buf, len);
+    xn297_rx_addr_scrambled_crc = initial;
+    for (uint8_t i = 0; i < xn297_addr_len; ++i) {
+        xn297_rx_addr_scrambled_crc = crc16_update(xn297_rx_addr_scrambled_crc, xn297_rx_addr_scrambled[xn297_addr_len-i-1]); //todo precompute when addr is set
+    }
     NRF24L01_WriteReg(NRF24L01_03_SETUP_AW, len-2);
     NRF24L01_WriteRegisterMulti(NRF24L01_0A_RX_ADDR_P0, buf, 5);
 }
@@ -140,20 +158,31 @@ void XN297_SetTxRxMode(enum TXRX_State mode) {
   if (mode==RX_EN) {
                 NRF24L01_WriteReg(NRF24L01_00_CONFIG, _BV(NRF24L01_00_PWR_UP) | _BV(NRF24L01_00_PRIM_RX)); // go into recieve mode
                 xn297_crc=0;
+                NRF24L01_WriteReg(NRF24L01_07_STATUS, 0x70);
+                NRF24L01_FlushTx();
   }
   if (mode==TX_EN) {
                 NRF24L01_WriteReg(NRF24L01_00_CONFIG, _BV(NRF24L01_00_PWR_UP) );
                 xn297_crc=1;
+                NRF24L01_WriteReg(NRF24L01_07_STATUS, 0x70);
+                NRF24L01_FlushRx();
   }
-  NRF24L01_WriteReg(NRF24L01_07_STATUS, 0x70);
-  NRF24L01_FlushRx();
-  NRF24L01_FlushTx();
 
 }
 uint8_t XN297_ReadPayload(uint8_t* msg, uint8_t len)
 {
     uint8_t res = NRF24L01_ReadPayload(msg, len);
+    uint16_t crc = xn297_rx_addr_scrambled_crc;
+
+    for (uint8_t i = 0; i < len-2; ++i) {
+        crc = crc16_update(crc, msg[i]);
+    }
+    crc ^= xn297_crc_xorout_scrambled[xn297_addr_len -3 +len -2]; //-2 subtract crc size
+
+    uint8_t pass_crc=(crc>>8)==msg[len-2] && (crc&0xff)==msg[len-1];
+    
     for(uint8_t i=0; i<len; i++)
         msg[i] = bit_reverse(msg[i]) ^ bit_reverse(xn297_scramble[i+xn297_addr_len]);
-    return res;
+        
+    return pass_crc;
 }
