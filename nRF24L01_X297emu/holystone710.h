@@ -3,10 +3,12 @@
 #define _HOLYSTONE710_H_
 extern uint8_t HS710_tx_addr[5];
 extern uint8_t HS710_rx_addr[5];
+extern uint8_t HS710_drone_bind_packet[];
+extern uint8_t HS710_unlock_packet[];
 
 
-#define HS710_rx_checksum  0x79
-#define HS710_tx_checksum 0x6d
+#define HS710_rx_checksum  0x6d
+#define HS710_tx_checksum  0x6d
 
 #define HS710_transmitter_payload 24
 #define HS710_drone_payload 16

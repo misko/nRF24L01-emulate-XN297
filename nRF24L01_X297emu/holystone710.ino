@@ -1,9 +1,25 @@
 
 #include "holystone710.h"
 
+//general transmission
 uint8_t HS710_tx_addr[5] = {0x24,0x6a,0x6a,0x1a,0x82};
 uint8_t HS710_rx_addr[5] = {0x24,0x6a,0x6a,0x1a,0x82}; //set command scrambles it
 
+//binding mode
+//uint8_t HS710_tx_addr[5] = {0x6d,0x6a,0x78,0x52,0x43};
+//uint8_t HS710_rx_addr[5] = {0x6d,0x6a,0x78,0x52,0x43}; 
+
+/*uint8_t HS710_drone_bind_packet[]= {0xdc,0x6a,0x1a,
+                  0x0,0x0,0x0,
+                  0x0,0x0,0x0,
+                  0x0,0x0,0x4b,
+                  0x0,0xa0,0x0,0x0};*/
+uint8_t HS710_drone_bind_packet[]= {0xdc,0x00,0x0C,
+                  0x0,0x0,0x0,
+                  0x0,0x0,0x0,
+                  0x0,0x0,0x0,
+                  0x0,0xa0,0x0,0x0};
+                  
 uint8_t HS710_unlock_packet[]= {0xCA,0xb6,0xde,0x24,
                   0x7d,0x7d,0x7d,0x7d,
                   0x20,0x20,0x20,0x78,
@@ -25,11 +41,20 @@ uint8_t HS710_default_packet[]= {0x00,0xb6,0xde,0x24,
 
 
 uint8_t HS710_checksum(uint8_t * this_packet, uint8_t len, TXRX_State txrx ) {
-  uint8_t checksum=txrx == TX_EN ? HS710_tx_checksum : HS710_rx_checksum;
-  for (int i=1; i<len; i++) {
-    checksum^=this_packet[i];
+  if (txrx == TX_EN) {
+    uint8_t checksum=HS710_tx_checksum;  
+    for (int i=1; i<len; i++) {
+      checksum^=this_packet[i];
+    }
+    return checksum;
   }
-  return checksum;
+  
+  uint8_t checksum=HS710_rx_checksum;
+  for (int i=1; i<len; i++) {
+    checksum+=this_packet[i];
+  }
+  return checksum&0xff;
+  
 }
 
 void HS710_packet_from_transmitter_state(HS710_TransmitterState * ts) {
@@ -80,6 +105,12 @@ void HS710_process(HS710_TransmitterState * ts) {
     ts->channel_pulse=false;
   }
 
+  if ( (current_hop/ts->time_channel_hop_length)%700==0 ) {
+    ts->lock_b=true;
+  } else {
+    ts->lock_b=false;
+  }
+
   if (ts->time_channel_emit_last!=current_hop) {
     ts->time_channel_emit_last=current_hop;
     emit=true;
@@ -96,13 +127,13 @@ void HS710_process(HS710_TransmitterState * ts) {
     XN297_WritePayload(packet, HS710_transmitter_payload); //(bind packet)
     //delay(1);
     
-    /*Serial.print(micros());
+    Serial.print(micros());
     Serial.print(" ");
     Serial.print(ts->rf_channel);
     Serial.print(" ");
     for (int i=0; i<24; i++) {
       Serial.print(packet[i],HEX);
     }
-    Serial.println("");*/
+    Serial.println("");
   }
 }

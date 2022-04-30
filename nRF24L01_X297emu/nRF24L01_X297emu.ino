@@ -21,7 +21,7 @@
 // SPI input
 #define  MISO_on (PIND & _BV(7)) // PD7
 
-#define RF_POWER TX_POWER_80mW 
+#define RF_POWER TX_POWER_5mW 
 
       
 uint8_t packet[128];
@@ -101,16 +101,32 @@ void setup()
 
 void loop()
 {
-    /*if (counter++==0) {
+    if (1==0 && counter++==0) {
       //Send unlock command to HS710
       XN297_SetTxRxMode(TX_EN);
       delayMicroseconds(5);
               NRF24L01_WriteReg(NRF24L01_07_STATUS,0x70);
               NRF24L01_FlushTx();
+
+              /*//hacking binding
+              NRF24L01_WriteReg(NRF24L01_05_RF_CH,55);
+
+              memcpy(packet,HS710_drone_bind_packet,16);
+              long r=random();
+              packet[1]=r&0xFF;
+              packet[2]=(r>>4)&0xFF;
+              packet[0]=HS710_checksum(packet,16,RX_EN);
+              for (int i=0; i<16; i++) {
+                Serial.print(packet[i],HEX);
+              }
+              Serial.println("");
+              XN297_WritePayload(packet, 16); //(bind packet)*/
+
+              //lock rotors
               NRF24L01_WriteReg(NRF24L01_05_RF_CH,56);
-              XN297_WritePayload(unlock_packet, sizeof(unlock_packet)); //(bind packet)
-      delay(1);
-    }*/
+              XN297_WritePayload(HS710_unlock_packet, 24);
+      //delay(700);
+    }
     
     //RX things
     /*XN297_SetTxRxMode(RX_EN);
@@ -132,11 +148,10 @@ void loop()
         }
     }*/
 
-    //
-    
-      //Serial.println("PROCESS");
       HS710_process(&ts);
-    //delay(100);
-                
+
+      /*if (Serial.available()) {
+        Serial.println("GOT SOME");
+      }*/
 
 }
