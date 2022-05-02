@@ -3,6 +3,11 @@
 #define _HOLYSTONE710_H_
 extern uint8_t HS710_tx_addr[5];
 extern uint8_t HS710_rx_addr[5];
+extern uint8_t binding_HS710_tx_addr[5];
+extern uint8_t binding_HS710_rx_addr[5];
+
+extern uint8_t HS710_drone_rx_packet[64];
+
 extern uint8_t HS710_drone_bind_packet[];
 extern uint8_t HS710_unlock_packet[];
 
@@ -63,6 +68,8 @@ enum HS710_TrasmitterPacketBytes {
 
 
 typedef struct HS710_TransmitterState{
+  bool bound;
+  
   float lCtrl_v;
   float lCtrl_h;
   float rCtrl_v;
@@ -77,6 +84,7 @@ typedef struct HS710_TransmitterState{
 
   //Frequency hoping
   uint8_t rf_channels[4]; 
+  uint8_t binding_rf_channels[4]; 
   uint8_t rf_channel; 
   
   unsigned long time_start;
